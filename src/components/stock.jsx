@@ -11,20 +11,18 @@ const StockTable = () => {
     { symbol: 'MSFT', companyName: 'Microsoft Corporation' },
   ];
 
-  const [openPrices, setOpenPrices] = useState({});
+  const [stockPrices, setStockPrices] = useState([]);
 
   useEffect(() => {
-    if (localStorage.getItem('openPrices')) {
-      const storedOpenPrices = JSON.parse(localStorage.getItem('openPrices'));
-      setOpenPrices(storedOpenPrices);
+    if (localStorage.getItem('stockPrices')) {
+      const storedStockPrices = JSON.parse(localStorage.getItem('stockPrices'));
+      setStockPrices(storedStockPrices);
     } else {
-      fetchOpenPrices();
+      fetchStockPrices();
     }
   }, []);
 
-  const fetchOpenPrices = async () => {
-    const openPricesObj = {};
-
+  const fetchStockPrices = async () => {
     try {
       const requests = stockData.map((stock) => {
         const { symbol } = stock;
@@ -36,19 +34,27 @@ const StockTable = () => {
             const data = response.data;
             if ('Error Message' in data) {
               console.log('Error:', data['Error Message']);
+              return null;
             } else {
-              const openPrice = data['Global Quote']['02. open'];
-              openPricesObj[symbol] = openPrice;
+              const stockPrice = {
+                symbol: symbol,
+                companyName: stock.companyName,
+                openPrice: data['Global Quote']['02. open'],
+                currentPrice: data['Global Quote']['05. price']
+              };
+              return stockPrice;
             }
           })
           .catch((error) => {
             console.log('An error occurred:', error);
+            return null;
           });
       });
 
-      await Promise.all(requests);
-      setOpenPrices(openPricesObj);
-      localStorage.setItem('openPrices', JSON.stringify(openPricesObj));
+      const resolvedRequests = await Promise.all(requests);
+      const validStockPrices = resolvedRequests.filter(stock => stock !== null);
+      setStockPrices(validStockPrices);
+      localStorage.setItem('stockPrices', JSON.stringify(validStockPrices));
     } catch (error) {
       console.log('An error occurred:', error);
     }
@@ -63,13 +69,12 @@ const StockTable = () => {
     <div>
       <select id="stock-select" onChange={handleStockSelect}>
         <option value="">Select a Stock</option>
-        {stockData.map((stock) => {
-          const { symbol, companyName } = stock;
-          const openPrice = openPrices[symbol];
+        {stockPrices.map((stock) => {
+          const { symbol, companyName, currentPrice } = stock;
 
           return (
             <option key={symbol} value={symbol}>
-              {companyName} - {openPrice}
+              {companyName} - {currentPrice}
             </option>
           );
         })}
@@ -77,8 +82,9 @@ const StockTable = () => {
 
       {selectedStock && (
         <div>
-          <h2>{stockData.find((stock) => stock.symbol === selectedStock)?.companyName}</h2>
-          <p>Open Price: {openPrices[selectedStock]}</p>
+          <h2>{stockPrices.find((stock) => stock.symbol === selectedStock)?.companyName}</h2>
+          <p>Open Price: {stockPrices.find((stock) => stock.symbol === selectedStock)?.openPrice}</p>
+          <p>Current Price: {stockPrices.find((stock) => stock.symbol === selectedStock)?.currentPrice}</p>
         </div>
       )}
     </div>
